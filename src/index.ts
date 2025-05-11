@@ -54,6 +54,29 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
       return;
     }
 
+    // DELETE /api/users/{userId}
+    if (method === "DELETE" && pathParts.length === 3) {
+      const userId = pathParts[2];
+
+      // check uid valid
+      if (!uuidValidate(userId)) {
+        sendResponse(res, 400, { message: "Invalid user ID" });
+        return;
+      }
+
+      // does uid exists
+      const userIndex = users.findIndex((u) => u.id === userId);
+      if (userIndex === -1) {
+        sendResponse(res, 404, { message: "User not found" });
+        return;
+      }
+
+      // delete
+      users.splice(userIndex, 1);
+      sendResponse(res, 204);
+      return;
+    }
+
     sendResponse(res, 404, { message: "Endpoint not found" });
   } catch (error) {
     console.error("Error processing request:", error);
