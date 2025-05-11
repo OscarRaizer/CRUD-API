@@ -54,6 +54,59 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
       return;
     }
 
+    // POST /api/users
+    if (method === "POST" && url === usersEndpoint) {
+      const parseBody = (req: IncomingMessage): Promise<any> => {
+        return new Promise((resolve, reject) => {
+          let body = "";
+          req.on("data", (chunk) => (body += chunk));
+          req.on("end", () => {
+            try {
+              resolve(JSON.parse(body));
+            } catch {
+              reject(new Error("Invalid JSON"));
+            }
+          });
+        });
+      };
+
+      const validateUserBody = (body: any): body is Omit<User, "id"> => {
+        return Boolean(
+          body?.username &&
+            typeof body.username === "string" &&
+            typeof body?.age === "number" &&
+            Array.isArray(body?.hobbies) &&
+            body.hobbies.every((h: any) => typeof h === "string"),
+        );
+      };
+
+      parseBody(req)
+        .then((body) => {
+          if (!validateUserBody(body)) {
+            sendResponse(res, 400, { message: "Missing or invalid fields" });
+            return;
+          }
+
+          const newUser: User = {
+            id: uuidv4(),
+            ...body,
+          };
+
+          users.push(newUser);
+          sendResponse(res, 201, newUser);
+        })
+        .catch((error) => {
+          sendResponse(res, 400, {
+            message:
+              error.message === "Invalid JSON"
+                ? "Invalid JSON format"
+                : "Invalid request body",
+          });
+        });
+
+      return;
+    }
+
     // DELETE /api/users/{userId}
     if (method === "DELETE" && pathParts.length === 3) {
       const userId = pathParts[2];
