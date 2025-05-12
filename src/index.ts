@@ -107,6 +107,75 @@ const server = createServer((req: IncomingMessage, res: ServerResponse) => {
       return;
     }
 
+    // PUT /api/users/{userId}
+    if (method === "PUT" && pathParts.length === 3) {
+      const userId = pathParts[2];
+
+      if (!uuidValidate(userId)) {
+        sendResponse(res, 400, { message: "Invalid user ID" });
+        return;
+      }
+
+      const userIndex = users.findIndex((u) => u.id === userId);
+      if (userIndex === -1) {
+        sendResponse(res, 404, { message: "User not found" });
+        return;
+      }
+
+      const parseBody = (req: IncomingMessage): Promise<any> => {
+        return new Promise((resolve, reject) => {
+          let body = "";
+          req.on("data", (chunk) => (body += chunk));
+          req.on("end", () => {
+            try {
+              resolve(JSON.parse(body));
+            } catch {
+              reject(new Error("Invalid JSON"));
+            }
+          });
+        });
+      };
+
+      const validateUserBody = (
+        body: any,
+      ): body is Partial<Omit<User, "id">> => {
+        return Boolean(
+          (!body.username || typeof body.username === "string") &&
+            (!body.age || typeof body.age === "number") &&
+            (!body.hobbies ||
+              (Array.isArray(body.hobbies) &&
+                body.hobbies.every((h: any) => typeof h === "string"))),
+        );
+      };
+
+      parseBody(req)
+        .then((body) => {
+          if (!validateUserBody(body)) {
+            sendResponse(res, 400, { message: "Missing or invalid fields" });
+            return;
+          }
+
+          const updatedUser = {
+            ...users[userIndex],
+            ...body,
+          };
+
+          users[userIndex] = updatedUser;
+
+          sendResponse(res, 200, updatedUser);
+        })
+        .catch((error) => {
+          sendResponse(res, 400, {
+            message:
+              error.message === "Invalid JSON"
+                ? "Invalid JSON format"
+                : "Invalid request body",
+          });
+        });
+
+      return;
+    }
+
     // DELETE /api/users/{userId}
     if (method === "DELETE" && pathParts.length === 3) {
       const userId = pathParts[2];
